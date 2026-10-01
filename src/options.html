@@ -1,0 +1,19 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>清译 · 翻译设置</title><link rel="stylesheet" href="ui.css"></head><body><main class="settings">
+<header><div class="brand"><div class="mark">译</div><div><h1>清译</h1><p>READ WITH CONTEXT</p></div></div><span class="tag">本地扩展 · 0.1.2</span></header>
+<div class="eyebrow">YOUR WORDS, IN CONTEXT</div><h2>让译文，更贴近原意。</h2><p class="lead">用 USTC 的模型阅读，设定你的语言和专业术语。<br>原文与译文并排于阅读顺序中，每段保留必要的上下文。</p>
+<form id="form"><section class="card"><h3>01 / 翻译服务</h3><p class="help">默认连接中国科学技术大学「词元计划」，也可切换兼容服务。</p><div class="fields">
+<div class="wide"><label for="preset">快速配置</label><select id="preset"><option value="ustc">USTC · 词元计划（默认）</option><option value="deepseek">DeepSeek 官方</option><option value="custom">自定义兼容 API</option><option value="ollama">本机 Ollama</option></select></div>
+<div class="wide"><label for="endpoint">API 地址</label><input id="endpoint" type="url" required autocomplete="off" spellcheck="false" placeholder="https://api.llm.ustc.edu.cn/v1"><p class="help">USTC 官方地址：https://api.llm.ustc.edu.cn/v1。校外使用请先连接校园网隧道（如 iWAN）。</p></div>
+<div><label for="model">模型名称</label><input id="model" list="modelList" required autocomplete="off" spellcheck="false" placeholder="qwen-chat"><datalist id="modelList"><option value="qwen-chat"></option></datalist><button class="link-button" id="models" type="button">读取已保存服务的可用模型 ↻</button><p class="help" id="modelsHelp">模型权限以你的 USTC 账号实际授权为准。</p></div>
+<div><label for="apiKey">API 密钥</label><input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="仅保存在此浏览器本机"><p class="help">填写词元计划 API Key；不是统一身份认证密码。不会同步到云端。</p></div>
+</div></section>
+<section class="card"><h3>02 / 阅读与准确度</h3><div class="fields">
+<div><label for="target">翻译成</label><select id="target"><option>简体中文</option><option>繁體中文</option><option>English</option><option>日本語</option><option>한국어</option><option>Deutsch</option><option>Français</option><option>Español</option></select></div>
+<div><label for="domain">内容领域</label><select id="domain"><option>通用</option><option>学术论文</option><option>生命科学与医学</option><option>物理与量子计算</option><option>计算机与软件工程</option><option>商业与财经</option><option>法律</option><option>文学</option></select></div>
+<div class="wide"><label for="glossary">术语表（可选）</label><textarea id="glossary" rows="4" maxlength="8000" placeholder="每行一条，例如：&#10;qubit = 量子比特&#10;gene expression = 基因表达"></textarea><p class="help">模型会结合语境参考术语表。提示词要求保留数字、单位、否定、引用和原文的不确定表达。</p></div>
+</div></section>
+<section class="card"><h3>03 / 请求稳定性</h3><div class="fields"><div><label for="concurrency">同时请求数</label><select id="concurrency"><option value="1">1 · 所有标签页全局串行</option></select></div><div><label for="requestInterval">最小请求间隔</label><select id="requestInterval"><option value="4000">4 秒 · 推荐</option><option value="8000">8 秒 · 更保守</option><option value="15000">15 秒</option><option value="30000">30 秒</option></select></div><div><label for="timeout">单次请求超时</label><select id="timeout"><option value="15">15 秒</option><option value="25">25 秒 · 推荐</option></select></div></div><p class="help">全局串行且每次请求至少间隔 4 秒。限流按服务商指定时间等待；未指定时从 30 秒起退避，最多自动恢复 3 次。明确额度不足时停止重试。网络及服务端错误最多重试 2 次。缓存仅保留在本次扩展会话中。</p></section>
+<div class="footer-actions"><button class="primary" id="save" type="submit">保存并授权</button><button id="test" type="button">测试已保存的连接</button><button id="clear" type="button">清除翻译缓存</button></div>
+<p id="status" class="status" role="status" aria-live="polite"></p><div id="testOutput"></div>
+<p class="notice">仅在你主动翻译时，将所选文本或网页段落、页面标题及相邻段落发送到你配置的 API。密钥保存在本机 Chrome 扩展存储中（并非系统钥匙串）。API 服务可能按用量计费，数据处理政策以所选服务商为准。<br>支持普通网页双语与划词翻译；当前版本不含 PDF、图片、视频字幕、跨域内嵌页和网站 Shadow DOM 内容翻译。</p>
+</form></main><script type="module" src="options.js"></script></body></html>
