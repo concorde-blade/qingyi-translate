@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>墨序</title>
+  <link rel="stylesheet" href="typography.css">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="icons/48.png" width="26" height="26" alt=""><h1>墨序</h1></div>
+    <div class="header-actions">
+      <button class="icon-button" id="newChat" title="新对话" aria-label="新对话"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M15 4l5 5M11 13l-1 4 4-1 7-7a2.1 2.1 0 0 0-5-5Z"/></svg></button>
+      <button class="icon-button" id="historyToggle" title="历史记录" aria-label="对话记录" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2"/></svg></button>
+      <details class="more-menu" id="moreMenu">
+        <summary class="icon-button" title="更多" aria-label="更多操作"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></summary>
+        <div class="menu-content" aria-label="更多操作">
+          <button data-page-action="start"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>翻译网页</button>
+          <button data-page-action="selection"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 9h8M10 9v7M14 9v7"/></svg>翻译选区</button>
+          <button data-page-action="restore"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5 3 10l5 5M3 10h10a7 7 0 0 1 7 7v2"/></svg>恢复原文</button>
+          <hr>
+          <button id="exportChat" aria-label="导出当前对话"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v5h14v-5"/></svg>导出对话</button>
+          <button id="refreshModels" aria-label="读取可用模型"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M5 17a8 8 0 1 0 0-10"/></svg>刷新模型</button>
+          <div class="menu-mode"><label for="mode">回答模式</label><select id="mode"><option value="chat">对话</option><option value="summarize">总结</option><option value="research">精读</option><option value="explain">解释</option><option value="translate">翻译</option><option value="rewrite">写作</option></select></div>
+          <hr>
+          <button id="settings" aria-label="服务与模型设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></svg>设置</button>
+        </div>
+      </details>
+    </div>
+  </header>
+  <div class="workspace-controls">
+  <section class="service-bar" aria-label="模型选择">
+    <span class="status-dot" id="serviceDot" aria-hidden="true"></span>
+    <label for="model" class="visually-hidden">对话模型名称</label>
+    <input id="model" list="models" autocomplete="off" spellcheck="false" maxlength="160" placeholder="选择模型" aria-describedby="serviceName">
+    <datalist id="models"></datalist><span id="serviceName" class="service-name"></span><button class="model-toggle" id="modelPicker" type="button" title="选择模型" aria-label="选择模型"><svg class="model-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg></button>
+  </section>
+  <section class="page-context" id="contextCard" aria-label="网页上下文">
+    <div class="context-heading"><span id="pageTitle"></span><button class="icon-button small" id="refreshContext" title="刷新网页" aria-label="刷新附加的网页内容" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M5 17a8 8 0 1 0 0-10"/></svg></button><button id="attachPage" class="attach-button" aria-pressed="false" title="发送问题时附加当前网页正文">＋ 附加网页</button></div>
+    <p id="contextDetail" hidden></p>
+  </section>
+  </div>
+  <aside id="historyPanel" class="history-panel" aria-label="对话记录" hidden>
+    <div class="section-heading"><h2>历史记录</h2><button class="text-button" id="closeHistory">收起</button></div>
+    <label class="visually-hidden" for="historySearch">搜索对话记录</label><input id="historySearch" class="search-input" placeholder="搜索对话" type="search">
+    <div id="historyList"></div>
+  </aside>
+  <main id="conversation" tabindex="-1">
+    <section id="welcome" class="welcome">
+      <div class="quick-grid" aria-label="快捷任务">
+        <button class="quick-card" data-task="summarize"><svg class="quick-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><svg class="quick-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span>总结网页</span></button>
+        <button class="quick-card" data-task="research"><svg class="quick-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1m0-14c3-2 6-2 9-1v14c-3-1-6-1-9 1Zm-6 3h3m6 0h3m-12 4h3m6 0h3"/></svg><svg class="quick-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span>精读论文</span></button>
+        <button class="quick-card" data-task="explain"><svg class="quick-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16c0-3-3-3-3-7a7 7 0 0 1 14 0c0 4-3 4-3 7M8 16h8M9 19h6m-5 3h4M12 6v5m-2-2 2 2 2-2"/></svg><svg class="quick-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span>解释概念</span></button>
+        <button class="quick-card" data-task="rewrite"><svg class="quick-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 5 5M4 20l5-1L20 8a3.5 3.5 0 0 0-5-5L4 14Zm0 0 5-1-5-5M14 20h6"/></svg><svg class="quick-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg><span>润色文字</span></button>
+      </div>
+      <div class="setup-notice" id="setupNotice" hidden><button id="setupService">连接 AI 服务 ↗</button></div>
+    </section>
+    <section id="messages" aria-label="对话消息"></section>
+    <button id="jumpLatest" class="jump-latest" title="回到最新" aria-label="回到最新" hidden>↓</button>
+  </main>
+  <footer class="composer-area">
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    <div id="attachments" class="attachments" aria-label="已添加的附件" hidden></div>
+    <input id="fileInput" type="file" multiple accept=".pdf,.txt,.md,.csv,.json,.log" hidden>
+    <form id="chatForm" class="composer">
+      <div id="composerResize" class="composer-resize" role="separator" tabindex="0" aria-label="调整输入框高度" aria-orientation="horizontal" aria-controls="prompt" aria-valuemin="30" aria-valuemax="360" aria-valuenow="30" title="拖动调节高度 · 双击恢复自动"></div>
+      <button id="addAttachment" class="composer-tool" type="button" title="添加文件" aria-label="添加文件"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 6-6a3 3 0 0 1 4 4L9 20a5 5 0 0 1-7-7L13 2m-5 15 9-9"/></svg></button>
+      <label for="prompt" class="visually-hidden">输入问题或粘贴文字</label><textarea id="prompt" rows="1" maxlength="24000" placeholder="输入问题…" title="Enter 发送，Shift + Enter 换行"></textarea>
+      <div class="composer-bottom"><button id="webSearchToggle" class="composer-tool web-search-toggle" type="button" aria-pressed="false" title="联网搜索" aria-label="联网搜索"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 4 6 4 9s-1 6-4 9c-3-3-4-6-4-9s1-6 4-9Z"/></svg></button><span id="inputCount" class="input-count visually-hidden"></span><button id="stop" class="stop-button" type="button" hidden>停止</button><button id="send" class="send-button" type="submit" aria-label="发送消息" title="发送"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 5v15"/></svg></button></div>
+    </form>
+  </footer>
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

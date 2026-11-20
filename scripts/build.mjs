@@ -1,6 +1,7 @@
 import {cp,mkdir,mkdtemp,readFile,writeFile,chmod,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import {migratePerformance} from '../src/core.js';
 
 const out=path.resolve('outputs');
 await mkdir(out,{recursive:true});
@@ -21,16 +22,26 @@ with zipfile.ZipFile(sys.argv[2],'w',zipfile.ZIP_DEFLATED) as z:
   await cp(publicDir,path.join(out,'qingyi-ustc'),{recursive:true});
   console.log(`Built outputs/qingyi-ustc-${manifest.version}.zip (no embedded credentials).`);
 
+  // Upgrade the already-installed local directory without reading or changing its seed.
+  if(process.argv.includes('--update-personal')) {
+    const personalDir=path.join(out,'qingyi-ustc-personal');
+    const installed=JSON.parse(await readFile(path.join(personalDir,'manifest.json'),'utf8'));
+    const backup=await mkdtemp(path.resolve('work/installed-backup-'));
+    await cp(personalDir,backup,{recursive:true});await chmod(backup,0o700);
+    await cp(publicDir,personalDir,{recursive:true,filter:source=>path.basename(source)!=='local-settings.js'});
+    await writeFile(path.join(personalDir,'manifest.json'),JSON.stringify({...manifest,name:'墨序',...(installed.host_permissions?{host_permissions:installed.host_permissions}:{})},null,2)+'\n');
+    console.log('Updated installed local directory; existing personal seed and Chrome settings preserved.');
+  }
+
   // Explicit opt-in only; the config and personal directory are ignored by Git.
   if(process.argv.includes('--personal')) {
-    const privateSettings=JSON.parse(await readFile('work/private/ustc-settings.json','utf8'));
-    privateSettings.concurrency=1;privateSettings.requestInterval=4000;
+    const privateSettings=migratePerformance(JSON.parse(await readFile('work/private/ustc-settings.json','utf8')));
     const personalDir=path.join(out,'qingyi-ustc-personal');
     await cp(publicDir,personalDir,{recursive:true});await chmod(personalDir,0o700);
     const settingsFile=path.join(personalDir,'local-settings.js');
     await writeFile(settingsFile,'// Personal configuration. Do not share.\nexport const LOCAL_SETTINGS = '+JSON.stringify(privateSettings)+';\n',{mode:0o600});
     await chmod(settingsFile,0o600);
-    manifest.name='清译 · USTC 本机版';manifest.host_permissions=['https://api.llm.ustc.edu.cn/*'];
+    manifest.name='墨序';manifest.host_permissions=['https://api.llm.ustc.edu.cn/*'];
     await writeFile(path.join(personalDir,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
     console.log('Updated private personal directory; do not upload or share it.');
   }

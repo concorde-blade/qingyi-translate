@@ -1,10 +1,31 @@
 export const DEFAULTS = Object.freeze({
   endpoint: 'https://api.llm.ustc.edu.cn/v1', model: 'qwen-chat', apiKey: '',
-  target: '简体中文', domain: '通用', glossary: '', timeout: 25, concurrency: 1, requestInterval: 4000
+  target: '简体中文', domain: '通用', glossary: '', timeout: 120, concurrency: 2, requestInterval: 1000,
+  selectionToolbar: true, streaming: true, performanceVersion: 1
 });
-export const MIN_REQUEST_INTERVAL = 4000;
+export const MIN_REQUEST_INTERVAL = 0;
 export const USTC_ENDPOINT = 'https://api.llm.ustc.edu.cn/v1';
 export const USTC_MODEL = 'qwen-chat';
+export function performanceSettings(input = {}) {
+  input=input || {};
+  const interval=Number(input.requestInterval);
+  return {
+    timeout:Math.min(180,Math.max(5,Number(input.timeout)||DEFAULTS.timeout)),
+    concurrency:Math.min(4,Math.max(1,Math.floor(Number(input.concurrency)||DEFAULTS.concurrency))),
+    requestInterval:Math.min(30000,Math.max(MIN_REQUEST_INTERVAL,Number.isFinite(interval)?interval:DEFAULTS.requestInterval)),
+    streaming:input.streaming!==false,performanceVersion:1
+  };
+}
+// Upgrade the old hard-coded limits once; retain deliberately slower pacing.
+export function migratePerformance(input = {}) {
+  if(input.performanceVersion===1)return input;
+  const upgraded={...input,
+    timeout:Number(input.timeout)>25?input.timeout:DEFAULTS.timeout,
+    concurrency:Number(input.concurrency)>1?input.concurrency:DEFAULTS.concurrency,
+    requestInterval:input.requestInterval==null || Number(input.requestInterval)===4000?DEFAULTS.requestInterval:input.requestInterval
+  };
+  return {...upgraded,...performanceSettings(upgraded)};
+}
 export class TranslateError extends Error {
   constructor(message, code = 'UNKNOWN', retryable = false, retryAfter = 0) {
     super(message); this.code = code; this.retryable = retryable; this.retryAfter = retryAfter;
@@ -30,9 +51,8 @@ export function validateSettings(input) {
   if (!['简体中文', '繁體中文', 'English', '日本語', '한국어', 'Deutsch', 'Français', 'Español'].includes(s.target)) throw new TranslateError('请选择支持的目标语言。', 'CONFIG');
   s.domain = String(s.domain || '通用').slice(0, 100);
   s.glossary = String(s.glossary || '').slice(0, 8000);
-  s.timeout = Math.min(25, Math.max(5, Number(s.timeout) || 25));
-  s.concurrency = 1;
-  s.requestInterval = Math.min(30000, Math.max(MIN_REQUEST_INTERVAL, Number(s.requestInterval) || 4000));
+  Object.assign(s,performanceSettings(s));
+  s.selectionToolbar = s.selectionToolbar !== false;
   return s;
 }
 export function splitText(text, max = 2600) {
@@ -83,11 +103,55 @@ export function abortableSleep(ms, signal) {
     signal?.addEventListener('abort', cancel, {once: true});
   });
 }
-export async function requestTranslation(text, context, s, {signal, fetchImpl = fetch, sleep = abortableSleep, beforeAttempt = async()=>{}} = {}) {
-  let lastError;
+export async function readTranslationStream(response,onProgress=()=>{},outputLabel='译文') {
+  if(!response.body)throw new TranslateError(`服务没有返回${outputLabel}流，请关闭流式显示后重试。`,'EMPTY_RESPONSE');
+  const reader=response.body.getReader(),decoder=new TextDecoder();
+  let buffer='',data=[],result='',finished=false,done=false;
+  function dispatch() {
+    if(!data.length)return;
+    const payload=data.join('\n');data=[];
+    if(payload.trim()==='[DONE]'){finished=true;done=true;return;}
+    let event;
+    try{event=JSON.parse(payload);}catch{throw new TranslateError(`服务返回的${outputLabel}流格式不正确，请关闭流式显示后重试。`,'INVALID_RESPONSE');}
+    if(event.error)throw new TranslateError(`服务中断了${outputLabel}生成，请重试。`,'STREAM_ERROR');
+    const choice=event.choices?.[0];
+    if(choice?.finish_reason==='length')throw new TranslateError('模型输出被截断，请缩短文本或更换模型。','TRUNCATED');
+    if(choice?.finish_reason==='content_filter')throw new TranslateError(`服务未完整返回这段内容的${outputLabel}。`,'INCOMPLETE_RESPONSE');
+    const delta=choice?.delta?.content;
+    if(typeof delta==='string' && delta){result+=delta;onProgress(result);}
+    if(choice?.finish_reason)finished=true;
+  }
+  function line(value) {
+    if(value.endsWith('\r'))value=value.slice(0,-1);
+    if(!value){dispatch();return;}
+    if(value.startsWith('data:'))data.push(value.slice(5).replace(/^ /,''));
+  }
+  try {
+    while(true){
+      const chunk=await reader.read();
+      if(chunk.done)break;
+      buffer+=decoder.decode(chunk.value,{stream:true});
+      let at;
+      while((at=buffer.indexOf('\n'))>=0){line(buffer.slice(0,at));buffer=buffer.slice(at+1);}
+      if(done){buffer='';break;}
+    }
+    buffer+=decoder.decode();if(buffer)line(buffer);dispatch();
+    if(!finished)throw new TranslateError(`${outputLabel}传输中断，当前内容可能不完整，请重试。`,'STREAM_INTERRUPTED');
+    if(!result.trim())throw new TranslateError(`服务未返回有效${outputLabel}，请检查模型。`,'EMPTY_RESPONSE');
+    return result.trim();
+  } finally {await reader.cancel().catch(()=>{});reader.releaseLock();}
+}
+export function requestTranslation(text, context, s, options = {}) {
+  return requestCompletion(messagesFor(text,context,s),s,{...options,outputLabel:'译文'});
+}
+// Shared transport only. Callers construct their own task-specific trusted prompt.
+export async function requestCompletion(messages, s, {signal, fetchImpl = fetch, sleep = abortableSleep, beforeAttempt = async()=>{}, onProgress=()=>{},outputLabel='回答'} = {}) {
+  let lastError,useStreaming=s.streaming!==false;
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (signal?.aborted) throw new TranslateError('已停止翻译。', 'CANCELLED');
+    if (signal?.aborted) throw new TranslateError('已停止请求。', 'CANCELLED');
     await beforeAttempt(signal);
+    if(signal?.aborted)throw new TranslateError('已停止请求。','CANCELLED');
+    if(attempt)onProgress('');
     const controller = new AbortController();
     const cancel = () => controller.abort();
     signal?.addEventListener('abort', cancel, {once: true});
@@ -95,24 +159,31 @@ export async function requestTranslation(text, context, s, {signal, fetchImpl = 
     try {
       const response = await fetchImpl(endpointURL(s.endpoint).href, {
         method: 'POST', headers: {'Content-Type': 'application/json', ...(s.apiKey ? {'Authorization': `Bearer ${s.apiKey}`} : {})},
-        body: JSON.stringify({model: s.model, messages: messagesFor(text, context, s), stream: false,
+        body: JSON.stringify({model: s.model, messages, stream: useStreaming,
           ...(endpointURL(s.endpoint).hostname === 'api.deepseek.com' && ['deepseek-flash','deepseek-v4-pro'].includes(s.model) ? {thinking:{type:'disabled'}} : {})}),
         signal: controller.signal, credentials: 'omit', redirect: 'error', cache: 'no-store'
       });
       if (!response.ok) {
         let detail; try {detail=await response.json();} catch {}
+        const reason=String(detail?.error?.message || detail?.message || detail?.error?.code || '');
+        if(useStreaming && [400,422].includes(response.status) && /stream/i.test(reason) && /unsupported|not supported|not support|invalid|unexpected|disabled|不支持/i.test(reason)){
+          useStreaming=false;attempt--;continue;
+        }
         throw httpError(response.status, retryDelay(response.headers.get('Retry-After')), detail);
       }
+      if(response.headers.get('Content-Type')?.includes('text/event-stream'))return await readTranslationStream(response,onProgress,outputLabel);
       let body;
       try { body = await response.json(); } catch { throw new TranslateError('服务返回了无效 JSON，请检查接口是否为 Chat Completions 兼容接口。', 'INVALID_RESPONSE'); }
       const choice = body?.choices?.[0];
       if (choice?.finish_reason === 'length') throw new TranslateError('模型输出被截断，请换用输出额度更大的模型或缩短文本。', 'TRUNCATED');
+      if (choice?.finish_reason === 'content_filter') throw new TranslateError(`服务未完整返回这段内容的${outputLabel}。`, 'INCOMPLETE_RESPONSE');
       const result = choice?.message?.content;
-      if (typeof result !== 'string' || !result.trim()) throw new TranslateError('服务未返回有效译文，请检查模型是否支持文本 Chat Completions。', 'EMPTY_RESPONSE');
+      if (typeof result !== 'string' || !result.trim()) throw new TranslateError(`服务未返回有效${outputLabel}，请检查模型是否支持文本 Chat Completions。`, 'EMPTY_RESPONSE');
       return result.trim();
     } catch (error) {
-      if (signal?.aborted) throw new TranslateError('已停止翻译。', 'CANCELLED');
-      lastError = error instanceof TranslateError ? error : new TranslateError(controller.signal.aborted ? '请求超时（25 秒以内），请重试或换用更快的模型。' : (endpointURL(s.endpoint).hostname === 'api.llm.ustc.edu.cn' ? '无法连接 USTC 接口，请检查校园网或 iWAN 隧道，以及接口访问授权。' : '网络连接失败，请检查 API 地址、网络和站点访问授权。'), controller.signal.aborted ? 'TIMEOUT' : 'NETWORK', true);
+      if (signal?.aborted) throw new TranslateError('已停止请求。', 'CANCELLED');
+      if(controller.signal.aborted)lastError=new TranslateError(`请求超过 ${s.timeout} 秒，已停止等待。可在设置中增加超时，或手动重试。`,'TIMEOUT');
+      else lastError=error instanceof TranslateError?error:new TranslateError(endpointURL(s.endpoint).hostname === 'api.llm.ustc.edu.cn' ? '无法连接 USTC 接口，请检查校园网或 iWAN 隧道，以及接口访问授权。' : '网络连接失败，请检查 API 地址、网络和站点访问授权。','NETWORK',true);
     } finally {
       clearTimeout(timer); signal?.removeEventListener('abort', cancel);
     }
@@ -124,13 +195,15 @@ export async function requestTranslation(text, context, s, {signal, fetchImpl = 
 }
 export class RequestQueue {
   constructor(limit = 2) { this.limit = limit; this.active = 0; this.waiting = []; }
-  run(fn, signal) {
+  setLimit(limit) {this.limit=limit;this.drain();}
+  run(fn, signal, priority = false) {
     return new Promise((resolve, reject) => {
       const entry = {fn, signal, resolve, reject};
       if (signal?.aborted) return reject(new TranslateError('已停止翻译。', 'CANCELLED'));
       entry.cancel = () => { const i = this.waiting.indexOf(entry); if (i >= 0) { this.waiting.splice(i, 1); reject(new TranslateError('已停止翻译。', 'CANCELLED')); } };
       signal?.addEventListener('abort', entry.cancel, {once: true});
-      this.waiting.push(entry); this.drain();
+      if (priority) this.waiting.unshift(entry); else this.waiting.push(entry);
+      this.drain();
     });
   }
   drain() {
@@ -146,29 +219,40 @@ export class RequestQueue {
 // Shared by every tab, paragraph, chunk and retry. Persist only timing, never text or keys.
 export class RateGate {
   constructor(state = {}, {now = Date.now, sleep = abortableSleep, persist = async()=>{}} = {}) {
-    this.state = {nextAt:0, cooldownUntil:0, strikes:0, intervalScale:1, ...state};
+    this.state = {nextAt:0, cooldownUntil:0, strikes:0, intervalScale:1, successes:0, ...state};
     this.now=now; this.sleep=sleep; this.persist=persist;
+    this.reservation=Promise.resolve();
   }
   error() {
     const e=new TranslateError('服务限流，正在等待自动恢复。','RATE_LIMIT');
     e.retryAt=this.state.cooldownUntil; return e;
   }
   async before(signal, interval) {
+    const ticket=this.reservation.then(async()=>{
+      if(signal?.aborted)throw new TranslateError('已停止翻译。','CANCELLED');
+      if(this.state.cooldownUntil>this.now())throw this.error();
+      const at=Math.max(this.now(),this.state.nextAt);
+      this.state.nextAt=at+Math.min(30000,interval*(this.state.intervalScale||1));
+      await this.persist({...this.state});return at;
+    });
+    this.reservation=ticket.then(()=>{},()=>{});
+    const at=await ticket;
+    await this.sleep(Math.max(0,at-this.now()),signal);
     if(this.state.cooldownUntil>this.now()) throw this.error();
-    await this.sleep(Math.max(0,this.state.nextAt-this.now()),signal);
-    if(this.state.cooldownUntil>this.now()) throw this.error();
-    this.state.nextAt=this.now()+Math.min(30000,interval*(this.state.intervalScale||1)); await this.persist({...this.state});
   }
   async limited(error, interval) {
     this.state.strikes=Math.min(6,this.state.strikes+1);
     this.state.intervalScale=Math.min(4,(this.state.intervalScale||1)*2);
+    this.state.successes=0;
     const delay=error.retryAfter || Math.min(300000,30000*2**(this.state.strikes-1));
     this.state.cooldownUntil=Math.max(this.state.cooldownUntil,this.now()+Math.max(interval,delay));
     await this.persist({...this.state}); return this.error();
   }
   async success() {
-    if(this.state.strikes || this.state.cooldownUntil) {
-      this.state.strikes=0;this.state.cooldownUntil=0;await this.persist({...this.state});
-    }
+    // Another in-flight request may succeed after a 429. It must not erase that cooldown.
+    if(this.state.cooldownUntil>this.now())return;
+    this.state.strikes=0;this.state.cooldownUntil=0;
+    if(this.state.intervalScale>1 && ++this.state.successes>=4){this.state.intervalScale/=2;this.state.successes=0;}
+    await this.persist({...this.state});
   }
 }

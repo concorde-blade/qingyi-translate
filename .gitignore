@@ -6,9 +6,12 @@ outputs/
 .env.*
 *.pem
 *.key
+local-settings.js
+!/src/local-settings.js
 playwright-report/
 test-results/
 # Local inspection tools for the third-party extension are outside this project.
+/lib.html
 scripts/patch-original.py
 scripts/check-original.mjs
 # Optional local integration checks use the private account configuration.

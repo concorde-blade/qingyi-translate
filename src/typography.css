@@ -1,0 +1,63 @@
+/* Independent CJK and Latin faces; proprietary font binaries are not bundled. */
+@font-face {
+  font-family: "Moxu Hiragino GB";
+  src: local("HiraginoSansGB-W3"), local("Hiragino Sans GB W3");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE10-FE1F, U+FE30-FE4F, U+FF00-FFEF, U+20000-323AF;
+}
+@font-face {
+  font-family: "Moxu Hiragino GB";
+  src: local("HiraginoSansGB-W6"), local("Hiragino Sans GB W6");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  unicode-range: U+2E80-2FFF, U+3000-303F, U+31C0-31EF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE10-FE1F, U+FE30-FE4F, U+FF00-FFEF, U+20000-323AF;
+}
+@font-face {
+  font-family: "Moxu Optima";
+  src: local("Optima-Regular"), local("Optima Regular");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0000-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-214F;
+}
+@font-face {
+  font-family: "Moxu Optima";
+  src: local("Optima-Bold"), local("Optima Bold");
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  unicode-range: U+0000-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-214F;
+}
+@font-face {
+  font-family: "Moxu Optima";
+  src: local("Optima-Italic"), local("Optima Italic");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0000-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-214F;
+}
+@font-face {
+  font-family: "Moxu Optima";
+  src: local("Optima-BoldItalic"), local("Optima Bold Italic");
+  font-style: italic;
+  font-weight: 600 700;
+  font-display: swap;
+  unicode-range: U+0000-024F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-214F;
+}
+
+:root {
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  --font-cjk: "Moxu Hiragino GB";
+  --font-latin: "Moxu Optima";
+  --font-math: KaTeX_Main, "Times New Roman", serif;
+  --font-text: var(--font-cjk), var(--font-latin), var(--font-system);
+  --font-reading: var(--font-text);
+  --font-heading: var(--font-text);
+  --font-code: "SF Mono", "Cascadia Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Chrome extension pages assign a UA body font, so root inheritance alone is insufficient. */
+body { font-family: var(--font-text); }

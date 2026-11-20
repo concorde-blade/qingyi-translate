@@ -1,30 +1,39 @@
 {
   "manifest_version": 3,
-  "name": "清译 · 上下文双语翻译",
-  "version": "0.1.2",
-  "description": "网页双语与划词翻译，直连自选 AI 服务，支持上下文、术语表、限流重试。",
+  "name": "墨序",
+  "version": "0.5.6",
+  "description": "AI 侧栏对话、联网搜索与来源引用、网页和 PDF 阅读、本地文件分析、写作与双语翻译，连接自己的模型服务。",
   "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
     "scripting",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "sidePanel"
   ],
   "optional_host_permissions": [
     "https://*/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
   "action": {
-    "default_title": "清译",
+    "default_title": "墨序",
     "default_popup": "popup.html"
   },
   "options_page": "options.html",
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "commands": {
+    "translate-selection": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "翻译所选文字，在原文下方显示"
+    },
     "toggle-translation": {
       "suggested_key": {
         "default": "Alt+Shift+T"
@@ -36,5 +45,6 @@
     "16": "icons/16.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
-  }
+  },
+  "short_name": "墨序"
 }
