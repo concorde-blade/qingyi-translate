@@ -10,6 +10,7 @@ const staging=await mkdtemp(path.resolve('work/build-'));
 try {
   const publicDir=path.join(staging,'qingyi-ustc');
   await cp('src',publicDir,{recursive:true});
+  await cp('LICENSE',path.join(publicDir,'LICENSE'));
   // Always remove any personal seed before building a distributable archive.
   await writeFile(path.join(publicDir,'local-settings.js'),'export const LOCAL_SETTINGS = null;\n');
   const manifest=JSON.parse(await readFile(path.join(publicDir,'manifest.json'),'utf8'));

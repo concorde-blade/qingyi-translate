@@ -135,3 +135,7 @@ Linux 上可使用 `npx playwright install --with-deps chromium` 安装浏览器
 此仓库为独立实现的墨序扩展，沿用清译项目目录与内部标识；不包含其他商业插件的安装包或修改版本。PDF.js 使用 Apache-2.0 许可，Markdown-It 与 KaTeX 使用 MIT 许可；来源与许可文件分别见 `src/vendor/pdfjs/`、`src/vendor/markdown-it/`、`src/vendor/katex/`。
 
 回答正文采用本机 Hiragino Sans GB（中文 W3）与 Optima Regular（英文），中文标题和强调使用 W6，英文使用独立 Bold/Italic 字重。未安装的设备使用系统无衬线备用字体，不随插件分发系统字库。正文 16px，公式与代码保留各自的专用字体。
+
+## 开源许可
+
+本项目原创代码采用 [MIT 许可证](LICENSE)，允许使用、修改和再分发。第三方库与附带字体保留各自的许可证，详见 `src/vendor/` 中的许可文件。安装包内同时附带本项目及第三方许可。
